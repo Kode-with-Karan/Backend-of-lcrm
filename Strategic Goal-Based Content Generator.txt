@@ -1,0 +1,1 @@
+curl.exe -X POST http://localhost:3002/api/goal/generate -H "Content-Type: application/json" -d "{ \"goal\": \"build sales pipeline\", \"idea\": \"We lost deals due to slow follow-ups. We rebuilt the process: instant email + CRM task within 60 seconds, a templated 3-step sequence, and a weekly review. Share the before/after and why it worked.\", \"temperature\": 0.6 }"

@@ -1,0 +1,1 @@
+curl -X POST http://localhost:3002/api/clone -H "Content-Type: application/json" -d "{\"posts\":[\"I learned that shipping fast beats perfect planning. Here is why ...\",\"We scaled to 10k users by focusing on onboarding friction ...\"],\"topic\":\"Overcoming founder burnout\",\"tone\":\"Professional\",\"copyPercent\":50}"

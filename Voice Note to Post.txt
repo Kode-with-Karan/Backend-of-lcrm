@@ -1,0 +1,7 @@
+curl -i -X POST http://localhost:3002/api/voice/upload \  -H "Accept: application/json" \  -F "audio=@a.mp3" \  -F "intent=Story"
+
+Voice note to post (multipart)
+curl -X POST http://localhost:3002/api/voice/upload `
+  -H "Accept: application/json" `
+  -F "audio=@C:/full/path/to/audio.mp3" `
+  -F "intent=Story"

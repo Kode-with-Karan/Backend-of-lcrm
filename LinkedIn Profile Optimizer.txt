@@ -1,0 +1,1 @@
+curl.exe --% -X POST http://localhost:3002/api/profile/analyze -H "Content-Type: application/json" -d "{ \"headline\": \"h\", \"about\": \"a\", \"experience\": \"e\" }"

@@ -1,0 +1,41 @@
+Quick health check
+curl -i http://localhost:3000/health
+Preferences
+Create preferences
+curl -i -X POST http://localhost:3000/api/calendar/preferences \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":\"u1\",\"role\":\"Founder\",\"preferredPostingTimes\":[\"10:00\",\"14:00\"]}"
+Get preferences
+curl -i http://localhost:3000/api/calendar/preferences/u1
+Update preferences
+curl -i -X PUT http://localhost:3000/api/calendar/preferences/u1 \
+  -H "Content-Type: application/json" \
+  -d "{\"contentTone\":\"Professional\",\"weeklySchedule\":{\"monday\":true,\"tuesday\":true,\"wednesday\":true,\"thursday\":true,\"friday\":true,\"saturday\":false,\"sunday\":false}}"
+Calendar operations (rich endpoints under /api/calendar)
+Auto-generate posts
+curl -i -X POST http://localhost:3000/api/calendar/autoGenerate \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":\"u1\",\"numberOfPosts\":3,\"userInputs\":{\"role\":\"Founder\",\"contentTone\":\"Professional\"}}"
+Calendar view for current month
+curl -i "http://localhost:3000/api/calendar/calendar-view?userId=u1"
+Events with optional date range
+curl -i "http://localhost:3000/api/calendar/events?userId=u1&start=2025-01-01&end=2025-12-31"
+Analytics
+curl -i "http://localhost:3000/api/calendar/analytics?userId=u1&period=month"
+Smart schedule
+curl -i -X POST http://localhost:3000/api/calendar/smart-schedule \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":\"u1\",\"posts\":[{\"title\":\"Post A\",\"content\":\"Text\",\"theme\":\"Tips\",\"hashtags\":[\"#a\"],\"scheduledDate\":\"2025-10-20\"},{\"title\":\"Post B\",\"content\":\"Text\",\"theme\":\"Educational\",\"hashtags\":[\"#b\"],\"scheduledDate\":\"2025-10-21\"}]}"
+Posts CRUD (mounted at /api/calendar/posts)
+Create post
+curl -i -X POST http://localhost:3000/api/calendar/posts \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"My Post\",\"content\":\"Hello\",\"theme\":\"Educational\",\"scheduledDate\":\"2025-10-20\",\"userId\":\"u1\",\"hashtags\":[\"#hello\"]}"
+List posts
+curl -i "http://localhost:3000/api/calendar/posts?userId=u1"
+Update post by id
+curl -i -X PUT http://localhost:3000/api/calendar/posts/POST_ID \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Updated Title\",\"userId\":\"u1\"}"
+Delete post by id
+curl -i -X DELETE "http://localhost:3000/api/calendar/posts/POST_ID?userId=u1"
