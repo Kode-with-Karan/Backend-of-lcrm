@@ -4,6 +4,9 @@ const { downloadAndTranscribe } = require("../services/whisperService");
 const { generateLinkedInPost } = require("../services/Post_yt_generator");
 
 async function ytToPost(req, res) {
+
+  console.log("ytToPost called");
+
   try {
     const { youtubeUrl, tone } = req.body;
 
