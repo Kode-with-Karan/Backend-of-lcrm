@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
     && ln -s /usr/bin/python3 /usr/bin/python \
+    && pip3 install yt-dlp \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

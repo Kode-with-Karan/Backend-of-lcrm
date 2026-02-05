@@ -220,7 +220,8 @@
 const tmp = require('tmp-promise');
 const fs = require('fs');
 const path = require('path');
-const ytdlp = require('yt-dlp-exec').create('/usr/bin/yt-dlp');
+// const ytdlp = require('yt-dlp-exec').create('/usr/bin/yt-dlp');
+const ytdlp = require('yt-dlp-exec');
 const ffmpegPath = require('ffmpeg-static');
 const { getYoutubeTranscript } = require('./transcriptService');
 
