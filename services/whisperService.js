@@ -1,100 +1,24 @@
+// ...existing code...
 // const tmp = require('tmp-promise');
 // const fs = require('fs');
 // const path = require('path');
-// const ytdlp = require('yt-dlp-exec');
+// // const ytdlp = require('yt-dlp-exec');
+// const ytdlp = require('yt-dlp-exec').create('/usr/bin/yt-dlp');
 // const ffmpegPath = require('ffmpeg-static');
-// const OpenAI = require('openai');
+// const { getYoutubeTranscript } = require('./transcriptService');
 
-// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// // Dynamic provider: prefer OpenAI if OPENAI_API_KEY is present, otherwise use AssemblyAI if ASSEMBLYAI_API_KEY is set.
+
+// console.log("Start")
+
 
 // if (typeof globalThis.File === 'undefined') {
 //   const { File } = require('node:buffer');
 //   globalThis.File = File;
 // }
-
+// console.log("validateYoutubeUrl befor start")
 // function validateYoutubeUrl(url) {
-//   if (!url || typeof url !== 'string') return false;
-//   try {
-//     const u = new URL(url);
-//     return u.hostname.includes('youtube.com') || u.hostname === 'youtu.be';
-//   } catch (e) {
-//     return false;
-//   }
-// }
-
-// async function downloadAndTranscribe(url) {
-//   if (!validateYoutubeUrl(url)) throw new Error('Invalid YouTube URL');
-
-//   // Detect placeholder values often used in examples
-//   if (url.includes('VIDEO_ID') || url.includes('{VIDEO_ID}')) {
-//     throw new Error('You must provide a real YouTube URL (replace VIDEO_ID placeholder)');
-//   }
-
-//   const tmpDir = await tmp.dir();
-//   const mp3Path = path.join(tmpDir.path, 'audio.mp3');
-
-//   try {
-//     // Run yt-dlp without relying on platform-specific cookie paths.
-//     // Remove the hardcoded cookies option which caused FileNotFoundError on Windows.
-//     const args = {
-//       extractAudio: true,
-//       audioFormat: 'mp3',
-//       audioQuality: '0',
-//       ffmpegLocation: ffmpegPath,
-//       output: mp3Path,
-//       quiet: true,
-//     };
-
-//     await ytdlp(url, args);
-
-//     // verify file exists
-//     if (!fs.existsSync(mp3Path)) {
-//       throw new Error('yt-dlp did not produce an audio file');
-//     }
-
-//     const audioStream = fs.createReadStream(mp3Path);
-//     const transcript = await openai.audio.transcriptions.create({
-//       model: 'whisper-1',
-//       file: audioStream,
-//     });
-
-//     return transcript.text;
-//   } catch (err) {
-//     // Enhance error message with stderr/stdout if available
-//     const details = (err.stderr || err.stdout) ? `; yt-dlp output: ${err.stderr || err.stdout}` : '';
-//     console.error('❌ Error in downloadAndTranscribe:', err.message || err, details);
-//     // rethrow a clearer error for callers
-//     throw new Error(`Whisper transcription failed: ${err.message || err}${details}`);
-//   } finally {
-//     // Cleanup temp dir
-//     try {
-//       fs.rmSync(tmpDir.path, { recursive: true, force: true });
-//     } catch (_) {
-//       // ignore cleanup errors
-//     }
-//   }
-// }
-
-// module.exports = { downloadAndTranscribe };
-
-
-
-
-// const tmp = require('tmp-promise');
-// const fs = require('fs');
-// const path = require('path');
-// const ytdlp = require('yt-dlp-exec');
-// const ffmpegPath = require('ffmpeg-static');
-// const OpenAI = require('openai');
-
-// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// if (typeof globalThis.File === 'undefined') {
-//   const { File } = require('node:buffer');
-//   globalThis.File = File;
-// }
-
-// function validateYoutubeUrl(url) {
+//   console.log("validateYoutubeUrl starts")
 //   if (!url || typeof url !== 'string') return false;
 //   try {
 //     const u = new URL(url);
@@ -104,17 +28,36 @@
 //   }
 // }
 
+// function extractYoutubeVideoId(url) {
+//   try {
+//     const u = new URL(url);
+//     // standard watch?v=VIDEO_ID
+//     if (u.searchParams && u.searchParams.get('v')) return u.searchParams.get('v');
+//     // youtu.be/VIDEO_ID
+//     if (u.hostname === 'youtu.be') return u.pathname.split('/').filter(Boolean)[0];
+//     // /shorts/VIDEO_ID or /embed/VIDEO_ID
+//     const parts = u.pathname.split('/').filter(Boolean);
+//     const idx = parts.findIndex(p => p === 'shorts' || p === 'embed');
+//     if (idx !== -1 && parts[idx + 1]) return parts[idx + 1];
+//   } catch {}
+//   return null;
+// }
+
 // async function downloadAndTranscribe(url) {
+//   console.log("is this runs2")
 //   if (!validateYoutubeUrl(url)) throw new Error('Invalid YouTube URL');
 //   if (url.includes('VIDEO_ID') || url.includes('{VIDEO_ID}')) {
 //     throw new Error('You must provide a real YouTube URL');
+//   }
+
+//   if (!process.env.OPENAI_API_KEY) {
+//     throw new Error('OPENAI_API_KEY is not set');
 //   }
 
 //   const tmpDir = await tmp.dir();
 //   const mp3Path = path.join(tmpDir.path, 'audio.mp3');
 
 //   try {
-//     // If cookies.txt exists, include it
 //     const cookieFile = fs.existsSync(path.resolve('./cookies.txt'))
 //       ? path.resolve('./cookies.txt')
 //       : null;
@@ -133,14 +76,14 @@
 //       retries: 5,
 //       noWarnings: true,
 //       format: 'bestaudio/best',
-//       // Use YouTube extractor args to bypass 403 protections
 //       'extractor-args': 'youtube:player_skip=webpage,config,js;player_client=android',
 //     };
 
 //     if (cookieFile) args.cookies = cookieFile;
 
 //     console.log('🎬 Downloading audio from:', url);
-//     await ytdlp(url, args);
+//     const ytdlpResult = await ytdlp(url, args);
+//     console.log('🧾 yt-dlp result (truncated):', typeof ytdlpResult === 'string' ? ytdlpResult.slice(0, 1000) : ytdlpResult);
 
 //     if (!fs.existsSync(mp3Path)) {
 //       throw new Error('yt-dlp did not produce an audio file');
@@ -148,18 +91,120 @@
 
 //     console.log('✅ Audio download complete, starting transcription...');
 //     const audioStream = fs.createReadStream(mp3Path);
-//     const transcript = await openai.audio.transcriptions.create({
-//       model: 'whisper-1',
-//       file: audioStream,
-//     });
 
-//     return transcript.text;
+//     // Transcription provider selection
+//     let text = '';
+
+//     if (process.env.OPENAI_API_KEY) {
+//       // lazy-require OpenAI SDK only when needed
+//       const OpenAI = require('openai');
+//       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+//       const transcript = await openai.audio.transcriptions.create({
+//         model: 'whisper-1',
+//         file: audioStream,
+//       });
+
+//       if (typeof transcript === 'string') {
+//         text = transcript;
+//       } else if (transcript && typeof transcript === 'object') {
+//         if (typeof transcript.text === 'string') text = transcript.text;
+//         else if (transcript.data && typeof transcript.data.text === 'string') text = transcript.data.text;
+//         else if (transcript.choices && transcript.choices[0] && typeof transcript.choices[0].text === 'string')
+//           text = transcript.choices[0].text;
+//       }
+//     } else if (process.env.ASSEMBLYAI_API_KEY) {
+//       // Use AssemblyAI as alternative provider
+//       async function transcribeWithAssembly(filePath) {
+//         const key = process.env.ASSEMBLYAI_API_KEY;
+//         if (!key) throw new Error('ASSEMBLYAI_API_KEY is not set');
+
+//         // Upload file
+//         const uploadRes = await fetch('https://api.assemblyai.com/v2/upload', {
+//           method: 'POST',
+//           headers: { authorization: key },
+//           body: fs.createReadStream(filePath),
+//         });
+//         const uploadJson = await uploadRes.json();
+//         if (!uploadJson || !uploadJson.upload_url) throw new Error('AssemblyAI upload failed');
+
+//         // Create transcription
+//         const createRes = await fetch('https://api.assemblyai.com/v2/transcript', {
+//           method: 'POST',
+//           headers: { authorization: key, 'Content-Type': 'application/json' },
+//           body: JSON.stringify({ audio_url: uploadJson.upload_url }),
+//         });
+//         const createJson = await createRes.json();
+//         if (!createJson || !createJson.id) throw new Error('AssemblyAI create failed');
+
+//         const id = createJson.id;
+//         const pollUrl = `https://api.assemblyai.com/v2/transcript/${id}`;
+
+//         const start = Date.now();
+//         const timeoutMs = Number(process.env.ASSEMBLYAI_TIMEOUT_MS || 3 * 60 * 1000);
+//         while (Date.now() - start < timeoutMs) {
+//           await new Promise((r) => setTimeout(r, 3000));
+//           const pollRes = await fetch(pollUrl, { headers: { authorization: key } });
+//           const pollJson = await pollRes.json();
+//           if (pollJson.status === 'completed') return pollJson.text || '';
+//           if (pollJson.status === 'error') throw new Error(`AssemblyAI error: ${pollJson.error}`);
+//         }
+//         throw new Error('AssemblyAI transcription timed out');
+//       }
+
+//       // ensure stream is closed before calling AssemblyAI (we use file path)
+//       audioStream.close && audioStream.close();
+//       text = await transcribeWithAssembly(mp3Path);
+//     } else {
+//       throw new Error('No transcription provider configured. Set OPENAI_API_KEY or ASSEMBLYAI_API_KEY');
+//     }
+
+//     if (text && text.toString().trim()) {
+//       return text.toString().trim();
+//     }
+
+//     // If Whisper returned empty, attempt fallback to YouTube captions
+//     console.warn('⚠ Whisper returned empty transcript; attempting captions fallback');
+//     const videoId = extractYoutubeVideoId(url);
+//     if (videoId) {
+//       const captions = await getYoutubeTranscript(videoId);
+//       if (captions && captions.trim()) {
+//         console.log('✅ Fallback captions fetched from YouTube transcript API');
+//         return captions.trim();
+//       }
+//     }
+
+
+
+//     // Nothing found
+//     console.log("mere pass hai 1")
+//     throw new Error('Transcript not found');
 //   } catch (err) {
+//     // If OpenAI failed or yt-dlp failed, attempt fallback before final failure
+//     // but only attempt captions fallback if not already tried
+//     console.log("mere pass hai 2")
+//     if (err.message && err.message.includes('Transcript not found')) {
+//       throw err;
+//     }
+
+//     console.error('❌ Error in downloadAndTranscribe primary flow:', err.message || err);
+//     // try captions fallback as a last resort
+//     try {
+//       const videoId = extractYoutubeVideoId(url);
+//       if (videoId) {
+//         const captions = await getYoutubeTranscript(videoId);
+//         if (captions && captions.trim()) {
+//           console.log('✅ Fallback captions fetched after error');
+//           return captions.trim();
+//         }
+//       }
+//     } catch (fallbackErr) {
+//       console.error('❌ Fallback captions also failed:', fallbackErr.message || fallbackErr);
+//     }
+
 //     const details =
 //       err.stderr || err.stdout
 //         ? `\n--- yt-dlp output ---\n${err.stderr || err.stdout}`
 //         : '';
-//     console.error('❌ Error in downloadAndTranscribe:', err.message || err, details);
 //     throw new Error(`Whisper transcription failed: ${err.message || err}${details}`);
 //   } finally {
 //     try {
@@ -169,32 +214,35 @@
 // }
 
 // module.exports = { downloadAndTranscribe };
+// // ...existing code...
 
-// ...existing code...
+
 const tmp = require('tmp-promise');
 const fs = require('fs');
 const path = require('path');
-// const ytdlp = require('yt-dlp-exec');
 const ytdlp = require('yt-dlp-exec').create('/usr/bin/yt-dlp');
 const ffmpegPath = require('ffmpeg-static');
 const { getYoutubeTranscript } = require('./transcriptService');
 
-// Dynamic provider: prefer OpenAI if OPENAI_API_KEY is present, otherwise use AssemblyAI if ASSEMBLYAI_API_KEY is set.
+console.log("🚀 Transcription Service Started");
 
-console.log("Start")
-
-
+// Ensure File exists (needed for OpenAI SDK in Node)
 if (typeof globalThis.File === 'undefined') {
   const { File } = require('node:buffer');
   globalThis.File = File;
 }
-console.log("validateYoutubeUrl befor start")
+
+/* -----------------------------
+   YOUTUBE URL VALIDATION
+------------------------------ */
 function validateYoutubeUrl(url) {
-  console.log("validateYoutubeUrl starts")
   if (!url || typeof url !== 'string') return false;
   try {
     const u = new URL(url);
-    return u.hostname.includes('youtube.com') || u.hostname === 'youtu.be';
+    return (
+      u.hostname.includes('youtube.com') ||
+      u.hostname === 'youtu.be'
+    );
   } catch {
     return false;
   }
@@ -203,33 +251,47 @@ function validateYoutubeUrl(url) {
 function extractYoutubeVideoId(url) {
   try {
     const u = new URL(url);
-    // standard watch?v=VIDEO_ID
-    if (u.searchParams && u.searchParams.get('v')) return u.searchParams.get('v');
-    // youtu.be/VIDEO_ID
-    if (u.hostname === 'youtu.be') return u.pathname.split('/').filter(Boolean)[0];
-    // /shorts/VIDEO_ID or /embed/VIDEO_ID
+
+    if (u.searchParams.get('v'))
+      return u.searchParams.get('v');
+
+    if (u.hostname === 'youtu.be')
+      return u.pathname.split('/').filter(Boolean)[0];
+
     const parts = u.pathname.split('/').filter(Boolean);
-    const idx = parts.findIndex(p => p === 'shorts' || p === 'embed');
-    if (idx !== -1 && parts[idx + 1]) return parts[idx + 1];
+    const idx = parts.findIndex(
+      (p) => p === 'shorts' || p === 'embed'
+    );
+
+    if (idx !== -1 && parts[idx + 1])
+      return parts[idx + 1];
+
   } catch {}
+
   return null;
 }
 
+/* -----------------------------
+   MAIN FUNCTION
+------------------------------ */
 async function downloadAndTranscribe(url) {
-  console.log("is this runs2")
-  if (!validateYoutubeUrl(url)) throw new Error('Invalid YouTube URL');
-  if (url.includes('VIDEO_ID') || url.includes('{VIDEO_ID}')) {
-    throw new Error('You must provide a real YouTube URL');
-  }
 
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is not set');
-  }
+  if (!validateYoutubeUrl(url))
+    throw new Error('Invalid YouTube URL');
+
+  if (url.includes('VIDEO_ID') || url.includes('{VIDEO_ID}'))
+    throw new Error('You must provide a real YouTube URL');
+
+  if (!process.env.OPENAI_API_KEY && !process.env.ASSEMBLYAI_API_KEY)
+    throw new Error(
+      'No transcription provider configured. Set OPENAI_API_KEY or ASSEMBLYAI_API_KEY'
+    );
 
   const tmpDir = await tmp.dir();
   const mp3Path = path.join(tmpDir.path, 'audio.mp3');
 
   try {
+
     const cookieFile = fs.existsSync(path.resolve('./cookies.txt'))
       ? path.resolve('./cookies.txt')
       : null;
@@ -248,142 +310,166 @@ async function downloadAndTranscribe(url) {
       retries: 5,
       noWarnings: true,
       format: 'bestaudio/best',
-      'extractor-args': 'youtube:player_skip=webpage,config,js;player_client=android',
+      'extractor-args':
+        'youtube:player_skip=webpage,config,js;player_client=android',
     };
 
     if (cookieFile) args.cookies = cookieFile;
 
-    console.log('🎬 Downloading audio from:', url);
-    const ytdlpResult = await ytdlp(url, args);
-    console.log('🧾 yt-dlp result (truncated):', typeof ytdlpResult === 'string' ? ytdlpResult.slice(0, 1000) : ytdlpResult);
+    console.log('🎬 Downloading audio...');
+    await ytdlp(url, args);
 
-    if (!fs.existsSync(mp3Path)) {
+    if (!fs.existsSync(mp3Path))
       throw new Error('yt-dlp did not produce an audio file');
-    }
 
-    console.log('✅ Audio download complete, starting transcription...');
-    const audioStream = fs.createReadStream(mp3Path);
+    console.log('✅ Audio download complete');
 
-    // Transcription provider selection
     let text = '';
 
+    /* -----------------------------
+       OPENAI WHISPER
+    ------------------------------ */
     if (process.env.OPENAI_API_KEY) {
-      // lazy-require OpenAI SDK only when needed
+
       const OpenAI = require('openai');
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const transcript = await openai.audio.transcriptions.create({
-        model: 'whisper-1',
-        file: audioStream,
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
-      if (typeof transcript === 'string') {
-        text = transcript;
-      } else if (transcript && typeof transcript === 'object') {
-        if (typeof transcript.text === 'string') text = transcript.text;
-        else if (transcript.data && typeof transcript.data.text === 'string') text = transcript.data.text;
-        else if (transcript.choices && transcript.choices[0] && typeof transcript.choices[0].text === 'string')
-          text = transcript.choices[0].text;
-      }
-    } else if (process.env.ASSEMBLYAI_API_KEY) {
-      // Use AssemblyAI as alternative provider
+      const transcript =
+        await openai.audio.transcriptions.create({
+          model: 'whisper-1',
+          file: fs.createReadStream(mp3Path),
+        });
+
+      if (transcript?.text)
+        text = transcript.text;
+
+    }
+
+    /* -----------------------------
+       ASSEMBLYAI
+    ------------------------------ */
+    else if (process.env.ASSEMBLYAI_API_KEY) {
+
       async function transcribeWithAssembly(filePath) {
+
         const key = process.env.ASSEMBLYAI_API_KEY;
-        if (!key) throw new Error('ASSEMBLYAI_API_KEY is not set');
 
-        // Upload file
-        const uploadRes = await fetch('https://api.assemblyai.com/v2/upload', {
-          method: 'POST',
-          headers: { authorization: key },
-          body: fs.createReadStream(filePath),
-        });
+        // Upload
+        const uploadRes = await fetch(
+          'https://api.assemblyai.com/v2/upload',
+          {
+            method: 'POST',
+            headers: { authorization: key },
+            body: fs.createReadStream(filePath),
+          }
+        );
+
         const uploadJson = await uploadRes.json();
-        if (!uploadJson || !uploadJson.upload_url) throw new Error('AssemblyAI upload failed');
 
-        // Create transcription
-        const createRes = await fetch('https://api.assemblyai.com/v2/transcript', {
-          method: 'POST',
-          headers: { authorization: key, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio_url: uploadJson.upload_url }),
-        });
+        if (!uploadJson.upload_url)
+          throw new Error('AssemblyAI upload failed');
+
+        // Create transcript
+        const createRes = await fetch(
+          'https://api.assemblyai.com/v2/transcript',
+          {
+            method: 'POST',
+            headers: {
+              authorization: key,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              audio_url: uploadJson.upload_url,
+            }),
+          }
+        );
+
         const createJson = await createRes.json();
-        if (!createJson || !createJson.id) throw new Error('AssemblyAI create failed');
-
         const id = createJson.id;
-        const pollUrl = `https://api.assemblyai.com/v2/transcript/${id}`;
 
+        const pollUrl =
+          `https://api.assemblyai.com/v2/transcript/${id}`;
+
+        const timeoutMs = 3 * 60 * 1000;
         const start = Date.now();
-        const timeoutMs = Number(process.env.ASSEMBLYAI_TIMEOUT_MS || 3 * 60 * 1000);
+
         while (Date.now() - start < timeoutMs) {
-          await new Promise((r) => setTimeout(r, 3000));
-          const pollRes = await fetch(pollUrl, { headers: { authorization: key } });
+
+          await new Promise(r => setTimeout(r, 3000));
+
+          const pollRes = await fetch(pollUrl, {
+            headers: { authorization: key },
+          });
+
           const pollJson = await pollRes.json();
-          if (pollJson.status === 'completed') return pollJson.text || '';
-          if (pollJson.status === 'error') throw new Error(`AssemblyAI error: ${pollJson.error}`);
+
+          if (pollJson.status === 'completed')
+            return pollJson.text;
+
+          if (pollJson.status === 'error')
+            throw new Error(pollJson.error);
         }
-        throw new Error('AssemblyAI transcription timed out');
+
+        throw new Error('AssemblyAI timeout');
       }
 
-      // ensure stream is closed before calling AssemblyAI (we use file path)
-      audioStream.close && audioStream.close();
       text = await transcribeWithAssembly(mp3Path);
-    } else {
-      throw new Error('No transcription provider configured. Set OPENAI_API_KEY or ASSEMBLYAI_API_KEY');
     }
 
-    if (text && text.toString().trim()) {
-      return text.toString().trim();
-    }
+    /* -----------------------------
+       VALID TRANSCRIPT
+    ------------------------------ */
+    if (text && text.trim())
+      return text.trim();
 
-    // If Whisper returned empty, attempt fallback to YouTube captions
-    console.warn('⚠ Whisper returned empty transcript; attempting captions fallback');
+    console.warn('⚠ Whisper returned empty transcript');
+
+    /* -----------------------------
+       FALLBACK: YOUTUBE CAPTIONS
+    ------------------------------ */
     const videoId = extractYoutubeVideoId(url);
+
     if (videoId) {
-      const captions = await getYoutubeTranscript(videoId);
-      if (captions && captions.trim()) {
-        console.log('✅ Fallback captions fetched from YouTube transcript API');
+      const captions =
+        await getYoutubeTranscript(videoId);
+
+      if (captions?.trim())
         return captions.trim();
-      }
     }
 
-
-
-    // Nothing found
-    console.log("mere pass hai 1")
     throw new Error('Transcript not found');
-  } catch (err) {
-    // If OpenAI failed or yt-dlp failed, attempt fallback before final failure
-    // but only attempt captions fallback if not already tried
-    console.log("mere pass hai 2")
-    if (err.message && err.message.includes('Transcript not found')) {
-      throw err;
-    }
 
-    console.error('❌ Error in downloadAndTranscribe primary flow:', err.message || err);
-    // try captions fallback as a last resort
+  } catch (err) {
+
+    console.error('❌ Primary flow failed:', err.message);
+
+    // Final fallback
     try {
       const videoId = extractYoutubeVideoId(url);
       if (videoId) {
-        const captions = await getYoutubeTranscript(videoId);
-        if (captions && captions.trim()) {
-          console.log('✅ Fallback captions fetched after error');
+        const captions =
+          await getYoutubeTranscript(videoId);
+        if (captions?.trim())
           return captions.trim();
-        }
       }
-    } catch (fallbackErr) {
-      console.error('❌ Fallback captions also failed:', fallbackErr.message || fallbackErr);
-    }
-
-    const details =
-      err.stderr || err.stdout
-        ? `\n--- yt-dlp output ---\n${err.stderr || err.stdout}`
-        : '';
-    throw new Error(`Whisper transcription failed: ${err.message || err}${details}`);
-  } finally {
-    try {
-      fs.rmSync(tmpDir.path, { recursive: true, force: true });
     } catch {}
+
+    throw new Error(
+      `Transcription failed: ${err.message}`
+    );
+
+  } finally {
+
+    try {
+      fs.rmSync(tmpDir.path, {
+        recursive: true,
+        force: true,
+      });
+    } catch {}
+
   }
 }
 
 module.exports = { downloadAndTranscribe };
-// ...existing code...
