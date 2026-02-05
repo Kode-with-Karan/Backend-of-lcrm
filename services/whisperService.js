@@ -293,6 +293,7 @@ async function downloadAndTranscribe(url) {
         'yt-dlp',
         [
           url,
+          '--cookies', 'cookies.txt',
           '--extract-audio',
           '--audio-format', 'mp3',
           '--audio-quality', '0',
