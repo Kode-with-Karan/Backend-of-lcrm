@@ -215,22 +215,7 @@
 
 // module.exports = { downloadAndTranscribe };
 // // ...existing code...
-
-const tmp = require('tmp-promise');
-const fs = require('fs');
-const path = require('path');
-const { execFile } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
 const { getYoutubeTranscript } = require('./transcriptService');
-
-if (typeof globalThis.File === 'undefined') {
-  const { File } = require('node:buffer');
-  globalThis.File = File;
-}
-
-/* -----------------------------
-   Utility Functions
-------------------------------*/
 
 function validateYoutubeUrl(url) {
   if (!url || typeof url !== 'string') return false;
@@ -266,7 +251,7 @@ function extractYoutubeVideoId(url) {
 }
 
 /* -----------------------------
-   Main Function
+   Main Function (Supadata Version)
 ------------------------------*/
 
 async function downloadAndTranscribe(url) {
@@ -274,159 +259,43 @@ async function downloadAndTranscribe(url) {
     throw new Error('Invalid YouTube URL');
   }
 
-  if (!process.env.OPENAI_API_KEY && !process.env.ASSEMBLYAI_API_KEY) {
-    throw new Error(
-      'No transcription provider configured.'
-    );
+  if (!process.env.SUPADATA_API_KEY) {
+    throw new Error('SUPADATA_API_KEY not configured');
   }
 
-  const tmpDir = await tmp.dir();
-  const mp3Path = path.join(tmpDir.path, 'audio.mp3');
-
   try {
-    console.log('🎬 Downloading audio...');
+    console.log('🧠 Transcribing using Supadata AI...');
 
-    const cookiesPath = '/etc/secrets/cookies.txt';
-    const args = [
-      url,
-      '--extract-audio',
-      '--audio-format', 'mp3',
-      '--audio-quality', '0',
-      '--ffmpeg-location', ffmpegPath,
-      '--output', mp3Path,
-      '--no-check-certificates',
-      '--retries', '3',
-      '--format', 'bestaudio/best'
-    ];
-
-    // Use cookies only if exists
-    if (fs.existsSync(cookiesPath)) {
-      console.log('🍪 Using cookies file');
-      args.push('--cookies', cookiesPath);
-    } else {
-      console.log('⚠ No cookies file found');
-    }
-
-    // Execute yt-dlp with timeout (IMPORTANT)
-    await new Promise((resolve, reject) => {
-      execFile(
-        'yt-dlp',
-        args,
-        {
-          timeout: 120000, // 2 min safety
-          maxBuffer: 1024 * 1024 * 20 // 20MB buffer
+    const response = await fetch(
+      'https://api.supadata.ai/v1/youtube/transcript',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SUPADATA_API_KEY}`
         },
-        (error, stdout, stderr) => {
-          if (error) {
-            console.error('yt-dlp stderr:', stderr);
-            return reject(error);
-          }
-          resolve(stdout);
-        }
-      );
-    });
-
-    if (!fs.existsSync(mp3Path)) {
-      throw new Error('yt-dlp did not produce audio file');
-    }
-
-    console.log('✅ Audio downloaded');
-
-    let text = '';
-
-    /* -----------------------------
-       OpenAI Whisper
-    ------------------------------*/
-    if (process.env.OPENAI_API_KEY) {
-      console.log('🧠 Using OpenAI Whisper');
-
-      const OpenAI = require('openai');
-      const openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      });
-
-      const transcript =
-        await openai.audio.transcriptions.create({
-          model: 'whisper-1',
-          file: fs.createReadStream(mp3Path)
-        });
-
-      text = transcript?.text || '';
-    }
-
-    /* -----------------------------
-       AssemblyAI (limited polling)
-    ------------------------------*/
-    else if (process.env.ASSEMBLYAI_API_KEY) {
-      console.log('🧠 Using AssemblyAI');
-
-      const key = process.env.ASSEMBLYAI_API_KEY;
-
-      const uploadRes = await fetch(
-        'https://api.assemblyai.com/v2/upload',
-        {
-          method: 'POST',
-          headers: { authorization: key },
-          body: fs.createReadStream(mp3Path)
-        }
-      );
-
-      const uploadJson = await uploadRes.json();
-      if (!uploadJson.upload_url)
-        throw new Error('AssemblyAI upload failed');
-
-      const createRes = await fetch(
-        'https://api.assemblyai.com/v2/transcript',
-        {
-          method: 'POST',
-          headers: {
-            authorization: key,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            audio_url: uploadJson.upload_url
-          })
-        }
-      );
-
-      const createJson = await createRes.json();
-      const id = createJson.id;
-
-      const pollUrl =
-        `https://api.assemblyai.com/v2/transcript/${id}`;
-
-      const start = Date.now();
-      const timeout = 3 * 60 * 1000; // 3 minutes max
-
-      while (Date.now() - start < timeout) {
-        await new Promise(r => setTimeout(r, 3000));
-
-        const pollRes = await fetch(pollUrl, {
-          headers: { authorization: key }
-        });
-
-        const pollJson = await pollRes.json();
-
-        if (pollJson.status === 'completed') {
-          text = pollJson.text;
-          break;
-        }
-
-        if (pollJson.status === 'error') {
-          throw new Error(pollJson.error);
-        }
+        body: JSON.stringify({
+          url: url
+        })
       }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Supadata API error: ${errText}`);
     }
+
+    const data = await response.json();
+
+    const text = data?.transcript || data?.text || '';
 
     if (text && text.trim()) {
       return text.trim();
     }
 
-    /* -----------------------------
-       Caption Fallback
-    ------------------------------*/
-    console.warn('⚠ Trying YouTube captions fallback');
+    console.warn('⚠ Supadata returned empty transcript. Trying captions fallback...');
 
+    // Fallback to manual captions
     const videoId = extractYoutubeVideoId(url);
     if (videoId) {
       const captions = await getYoutubeTranscript(videoId);
@@ -438,9 +307,9 @@ async function downloadAndTranscribe(url) {
     throw new Error('Transcript not found');
 
   } catch (err) {
-    console.error('❌ Transcription failed:', err.message);
+    console.error('❌ Supadata transcription failed:', err.message);
 
-    // Final caption fallback
+    // Final fallback
     try {
       const videoId = extractYoutubeVideoId(url);
       if (videoId) {
@@ -452,11 +321,6 @@ async function downloadAndTranscribe(url) {
     } catch {}
 
     throw err;
-
-  } finally {
-    try {
-      fs.rmSync(tmpDir.path, { recursive: true, force: true });
-    } catch {}
   }
 }
 
