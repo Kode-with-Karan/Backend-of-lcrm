@@ -178,8 +178,7 @@ const path = require('path');
 const ytdlp = require('yt-dlp-exec').create('/usr/bin/yt-dlp');
 const ffmpegPath = require('ffmpeg-static');
 const { getYoutubeTranscript } = require('./transcriptService');
-const { execSync } = require('child_process');
-console.log(execSync('which yt-dlp').toString());
+
 // Dynamic provider: prefer OpenAI if OPENAI_API_KEY is present, otherwise use AssemblyAI if ASSEMBLYAI_API_KEY is set.
 
 console.log("Start")
