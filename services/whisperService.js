@@ -216,7 +216,6 @@
 // module.exports = { downloadAndTranscribe };
 // // ...existing code...
 
-
 const tmp = require('tmp-promise');
 const fs = require('fs');
 const path = require('path');
@@ -277,7 +276,7 @@ async function downloadAndTranscribe(url) {
 
   if (!process.env.OPENAI_API_KEY && !process.env.ASSEMBLYAI_API_KEY) {
     throw new Error(
-      'No transcription provider configured. Set OPENAI_API_KEY or ASSEMBLYAI_API_KEY'
+      'No transcription provider configured.'
     );
   }
 
@@ -287,32 +286,42 @@ async function downloadAndTranscribe(url) {
   try {
     console.log('🎬 Downloading audio...');
 
-    // Run yt-dlp using system binary
+    const cookiesPath = '/etc/secrets/cookies.txt';
+    const args = [
+      url,
+      '--extract-audio',
+      '--audio-format', 'mp3',
+      '--audio-quality', '0',
+      '--ffmpeg-location', ffmpegPath,
+      '--output', mp3Path,
+      '--no-check-certificates',
+      '--retries', '3',
+      '--format', 'bestaudio/best'
+    ];
+
+    // Use cookies only if exists
+    if (fs.existsSync(cookiesPath)) {
+      console.log('🍪 Using cookies file');
+      args.push('--cookies', cookiesPath);
+    } else {
+      console.log('⚠ No cookies file found');
+    }
+
+    // Execute yt-dlp with timeout (IMPORTANT)
     await new Promise((resolve, reject) => {
       execFile(
         'yt-dlp',
-        [
-          url,
-          '--cookies', '/etc/secrets/cookies.txt',
-          '--extract-audio',
-          '--audio-format', 'mp3',
-          '--audio-quality', '0',
-          '--ffmpeg-location', ffmpegPath,
-          '--output', mp3Path,
-          '--no-check-certificates',
-          '--user-agent',
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          '--referer', 'https://www.youtube.com',
-          '--retries', '5',
-          '--format', 'bestaudio/best'
-        ],
+        args,
+        {
+          timeout: 120000, // 2 min safety
+          maxBuffer: 1024 * 1024 * 20 // 20MB buffer
+        },
         (error, stdout, stderr) => {
           if (error) {
-            console.error(stderr);
-            reject(error);
-          } else {
-            resolve(stdout);
+            console.error('yt-dlp stderr:', stderr);
+            return reject(error);
           }
+          resolve(stdout);
         }
       );
     });
@@ -321,7 +330,7 @@ async function downloadAndTranscribe(url) {
       throw new Error('yt-dlp did not produce audio file');
     }
 
-    console.log('✅ Audio downloaded, starting transcription...');
+    console.log('✅ Audio downloaded');
 
     let text = '';
 
@@ -329,6 +338,8 @@ async function downloadAndTranscribe(url) {
        OpenAI Whisper
     ------------------------------*/
     if (process.env.OPENAI_API_KEY) {
+      console.log('🧠 Using OpenAI Whisper');
+
       const OpenAI = require('openai');
       const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY
@@ -344,9 +355,11 @@ async function downloadAndTranscribe(url) {
     }
 
     /* -----------------------------
-       AssemblyAI Fallback
+       AssemblyAI (limited polling)
     ------------------------------*/
     else if (process.env.ASSEMBLYAI_API_KEY) {
+      console.log('🧠 Using AssemblyAI');
+
       const key = process.env.ASSEMBLYAI_API_KEY;
 
       const uploadRes = await fetch(
@@ -382,11 +395,16 @@ async function downloadAndTranscribe(url) {
       const pollUrl =
         `https://api.assemblyai.com/v2/transcript/${id}`;
 
-      while (true) {
+      const start = Date.now();
+      const timeout = 3 * 60 * 1000; // 3 minutes max
+
+      while (Date.now() - start < timeout) {
         await new Promise(r => setTimeout(r, 3000));
+
         const pollRes = await fetch(pollUrl, {
           headers: { authorization: key }
         });
+
         const pollJson = await pollRes.json();
 
         if (pollJson.status === 'completed') {
@@ -405,9 +423,9 @@ async function downloadAndTranscribe(url) {
     }
 
     /* -----------------------------
-       YouTube Caption Fallback
+       Caption Fallback
     ------------------------------*/
-    console.warn('⚠ Empty transcript, trying captions...');
+    console.warn('⚠ Trying YouTube captions fallback');
 
     const videoId = extractYoutubeVideoId(url);
     if (videoId) {
@@ -418,10 +436,11 @@ async function downloadAndTranscribe(url) {
     }
 
     throw new Error('Transcript not found');
+
   } catch (err) {
     console.error('❌ Transcription failed:', err.message);
 
-    // Final fallback attempt
+    // Final caption fallback
     try {
       const videoId = extractYoutubeVideoId(url);
       if (videoId) {
@@ -433,6 +452,7 @@ async function downloadAndTranscribe(url) {
     } catch {}
 
     throw err;
+
   } finally {
     try {
       fs.rmSync(tmpDir.path, { recursive: true, force: true });
