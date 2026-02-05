@@ -215,7 +215,12 @@
 
 // module.exports = { downloadAndTranscribe };
 // // ...existing code...
+// ...existing code...
 const { getYoutubeTranscript } = require('./transcriptService');
+
+/* -----------------------------
+   Utility Functions
+------------------------------*/
 
 function validateYoutubeUrl(url) {
   if (!url || typeof url !== 'string') return false;
@@ -251,77 +256,92 @@ function extractYoutubeVideoId(url) {
 }
 
 /* -----------------------------
-   Main Function (Supadata Version)
+   Main Function
 ------------------------------*/
 
 async function downloadAndTranscribe(url) {
+  console.log("ytToPost called");
+  console.log("youtubeUrl", url);
+
   if (!validateYoutubeUrl(url)) {
-    throw new Error('Invalid YouTube URL');
+    throw new Error("Invalid YouTube URL");
   }
 
   if (!process.env.SUPADATA_API_KEY) {
-    throw new Error('SUPADATA_API_KEY not configured');
+    throw new Error("SUPADATA_API_KEY is not set");
   }
 
   try {
-    console.log('🧠 Transcribing using Supadata AI...');
+    const videoId = extractYoutubeVideoId(url);
+    if (!videoId) {
+      throw new Error("Could not extract video ID");
+    }
 
+    const normalizedUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+    console.log("🧠 Transcribing using Supadata AI...");
+    console.log("Normalized URL:", normalizedUrl);
+
+    // reminding: // ensure Node 18+ or fetch available
     const response = await fetch(
-      'https://api.supadata.ai/v1/youtube/transcript',
+      `https://api.supadata.ai/v1/transcript?url=${encodeURIComponent(normalizedUrl)}`,
       {
-        method: 'POST',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.SUPADATA_API_KEY}`
+          "x-api-key": process.env.SUPADATA_API_KEY,
+          "Accept": "application/json"
         },
-        body: JSON.stringify({
-          url: url
-        })
       }
     );
 
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Supadata API error: ${errText}`);
+      const errorText = await response.text();
+      throw new Error(`Supadata API error (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
 
-    const text = data?.transcript || data?.text || '';
-
-    if (text && text.trim()) {
-      return text.trim();
+    if (!data || !Array.isArray(data.content)) {
+      throw new Error("Invalid Supadata response structure");
     }
 
-    console.warn('⚠ Supadata returned empty transcript. Trying captions fallback...');
+    // Combine transcript segments safely
+    const text = data.content
+      .map(segment => segment?.text || "")
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    // Fallback to manual captions
-    const videoId = extractYoutubeVideoId(url);
-    if (videoId) {
-      const captions = await getYoutubeTranscript(videoId);
-      if (captions?.trim()) {
-        return captions.trim();
-      }
+    if (text && text.length > 10) {
+      console.log("✅ Supadata transcript received");
+      console.log("Transcript length:", text.split(/\s+/).length, "words");
+      return text;
     }
 
-    throw new Error('Transcript not found');
+    throw new Error("Transcript too short or empty");
 
   } catch (err) {
-    console.error('❌ Supadata transcription failed:', err.message);
+    console.error("❌ Supadata transcription failed:", err.message);
 
-    // Final fallback
+    // 🔁 Fallback to YouTube captions API
     try {
       const videoId = extractYoutubeVideoId(url);
       if (videoId) {
+        console.log("⚠ Trying YouTube captions fallback...");
         const captions = await getYoutubeTranscript(videoId);
-        if (captions?.trim()) {
+
+        if (captions && captions.trim()) {
+          console.log("✅ Fallback captions fetched");
           return captions.trim();
         }
       }
-    } catch {}
+    } catch (fallbackErr) {
+      console.error("❌ Fallback captions also failed:", fallbackErr.message);
+    }
 
-    throw err;
+    throw new Error(`Supadata transcription failed: ${err.message}`);
   }
 }
 
 module.exports = { downloadAndTranscribe };
+// ...existing code...
